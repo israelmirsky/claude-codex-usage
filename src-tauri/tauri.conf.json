@@ -24,10 +24,7 @@
         "resizable": false
       }
     ],
-    "trayIcon": {
-      "iconPath": "icons/icon.png",
-      "iconAsTemplate": true
-    }
+    "trayIcon": null
   },
   "bundle": {
     "active": true,
