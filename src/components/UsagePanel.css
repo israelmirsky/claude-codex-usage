@@ -4,22 +4,41 @@
   background: #1a1a1a;
 }
 
-.usage-panel__header {
+.usage-panel__tabs {
   display: flex;
-  justify-content: space-between;
   align-items: center;
+  gap: 2px;
   margin-bottom: 14px;
+  border-bottom: 1px solid #2a2a2a;
+  padding-bottom: 8px;
 }
 
-.usage-panel__title {
-  font-size: 14px;
+.usage-panel__tab {
+  background: none;
+  border: none;
+  color: #707070;
+  cursor: pointer;
+  font-size: 13px;
   font-weight: 600;
-  color: #e0e0e0;
+  padding: 4px 12px;
+  border-radius: 4px;
+  transition: background 0.15s, color 0.15s;
 }
 
-.usage-panel__actions {
+.usage-panel__tab:hover {
+  background: #2a2a2a;
+  color: #c0c0c0;
+}
+
+.usage-panel__tab--active {
+  color: #e0e0e0;
+  background: #2a2a2a;
+}
+
+.usage-panel__tab-actions {
   display: flex;
   gap: 4px;
+  margin-left: auto;
 }
 
 .usage-panel__btn {
@@ -71,6 +90,14 @@
   text-transform: uppercase;
   letter-spacing: 0.5px;
   margin-bottom: 8px;
+}
+
+.usage-panel__provider-header {
+  font-size: 12px;
+  font-weight: 700;
+  color: #c0c0c0;
+  margin-bottom: 6px;
+  letter-spacing: 0.3px;
 }
 
 .usage-panel__footer {

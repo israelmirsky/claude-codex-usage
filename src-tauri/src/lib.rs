@@ -1,6 +1,8 @@
+mod codex_fetcher;
 mod cookie_reader;
 mod usage_fetcher;
 
+use codex_fetcher::CodexState;
 use tauri::{
     image::Image,
     tray::TrayIconBuilder,
@@ -9,7 +11,7 @@ use tauri::{
 use usage_fetcher::{UsageData, UsageState};
 
 #[tauri::command]
-async fn fetch_usage_data(state: tauri::State<'_, UsageState>) -> Result<UsageData, String> {
+async fn fetch_claude_usage(state: tauri::State<'_, UsageState>) -> Result<UsageData, String> {
     let cookies = cookie_reader::read_claude_cookies().map_err(|e| e.to_string())?;
     let data = usage_fetcher::fetch_usage(&cookies, &state.client).await?;
     *state.last_data.lock().unwrap() = Some(data.clone());
@@ -17,19 +19,47 @@ async fn fetch_usage_data(state: tauri::State<'_, UsageState>) -> Result<UsageDa
 }
 
 #[tauri::command]
-fn get_cached_usage(state: tauri::State<'_, UsageState>) -> Option<UsageData> {
+fn get_cached_claude(state: tauri::State<'_, UsageState>) -> Option<UsageData> {
+    state.last_data.lock().unwrap().clone()
+}
+
+#[tauri::command]
+async fn fetch_codex_usage(
+    usage_state: tauri::State<'_, UsageState>,
+    codex_state: tauri::State<'_, CodexState>,
+) -> Result<UsageData, String> {
+    let data = codex_fetcher::fetch_codex_usage(&usage_state.client).await?;
+    *codex_state.last_data.lock().unwrap() = Some(data.clone());
+    Ok(data)
+}
+
+#[tauri::command]
+fn get_cached_codex(state: tauri::State<'_, CodexState>) -> Option<UsageData> {
     state.last_data.lock().unwrap().clone()
 }
 
 #[tauri::command]
 fn update_tray_text(
     app: tauri::AppHandle,
-    session_pct: u32,
-    weekly_pct: u32,
+    claude_session: i32,
+    claude_weekly: i32,
+    codex_session: i32,
+    codex_weekly: i32,
 ) -> Result<(), String> {
     if let Some(tray) = app.tray_by_id("main") {
-        tray.set_title(Some(&format!("S:{}% W:{}%", session_pct, weekly_pct)))
-            .map_err(|e| e.to_string())?;
+        let mut parts = Vec::new();
+        if claude_session >= 0 && claude_weekly >= 0 {
+            parts.push(format!("C:{}/{}%", claude_session, claude_weekly));
+        }
+        if codex_session >= 0 && codex_weekly >= 0 {
+            parts.push(format!("X:{}/{}%", codex_session, codex_weekly));
+        }
+        let text = if parts.is_empty() {
+            "Usage: --%".to_string()
+        } else {
+            parts.join("  ")
+        };
+        tray.set_title(Some(&text)).map_err(|e| e.to_string())?;
     }
     Ok(())
 }
@@ -48,14 +78,15 @@ pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_shell::init())
         .manage(UsageState::new())
+        .manage(CodexState::new())
         .setup(|app| {
             // Build system tray with a tiny 1x1 transparent icon (text-only tray)
             let icon = Image::new(&[0u8; 4], 1, 1);
             let _tray = TrayIconBuilder::with_id("main")
                 .icon(icon)
                 .icon_as_template(true)
-                .title("S:--% W:--%")
-                .tooltip("Claude Usage Widget")
+                .title("C:--% X:--%")
+                .tooltip("Usage Widget")
                 .on_tray_icon_event(|tray, event| {
                     use tauri::tray::{MouseButton, MouseButtonState, TrayIconEvent};
                     if let TrayIconEvent::Click {
@@ -89,8 +120,10 @@ pub fn run() {
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
-            fetch_usage_data,
-            get_cached_usage,
+            fetch_claude_usage,
+            get_cached_claude,
+            fetch_codex_usage,
+            get_cached_codex,
             update_tray_text,
             toggle_pin,
         ])
