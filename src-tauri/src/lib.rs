@@ -16,7 +16,7 @@ use settings::SettingsState;
 use tauri::{
     image::Image,
     menu::{CheckMenuItem, Menu, MenuItem, PredefinedMenuItem, Submenu},
-    tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent},
+    tray::TrayIconBuilder,
     Emitter, Manager,
 };
 use tauri_plugin_autostart::MacosLauncher;
@@ -258,25 +258,7 @@ pub fn run() {
                 .title("C:--% X:--%")
                 .tooltip("Usage Widget")
                 .menu(&menu)
-                .show_menu_on_left_click(false)
-                .on_tray_icon_event(|tray, event| {
-                    if let TrayIconEvent::Click {
-                        button: MouseButton::Left,
-                        button_state: MouseButtonState::Up,
-                        ..
-                    } = event
-                    {
-                        let app = tray.app_handle();
-                        if let Some(window) = app.get_webview_window("main") {
-                            if window.is_visible().unwrap_or(false) {
-                                let _ = window.hide();
-                            } else {
-                                let _ = window.show();
-                                let _ = window.set_focus();
-                            }
-                        }
-                    }
-                })
+                .show_menu_on_left_click(true)
                 .on_menu_event(move |app, event| {
                     let id = event.id().as_ref();
                     match id {
