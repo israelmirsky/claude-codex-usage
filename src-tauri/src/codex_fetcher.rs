@@ -1,3 +1,10 @@
+//! Fetches OpenAI Codex usage data via the ChatGPT backend API.
+//!
+//! Reads the OAuth token from `~/.codex/auth.json` (written by the Codex CLI) and
+//! calls `GET https://chatgpt.com/backend-api/wham/usage` to retrieve rate limit
+//! data including primary (session) and secondary (weekly) windows, model-specific
+//! limits, and credit balance.
+
 use std::sync::Mutex;
 
 use reqwest::Client;

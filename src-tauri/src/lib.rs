@@ -1,3 +1,9 @@
+//! Claude/Codex Usage - a macOS menu bar widget for monitoring AI rate limits.
+//!
+//! This is the Tauri backend that fetches usage data from Claude.ai and OpenAI Codex,
+//! manages a system tray icon with live usage percentages, and serves data to the
+//! React frontend via Tauri IPC commands.
+
 mod codex_fetcher;
 mod cookie_reader;
 mod usage_fetcher;

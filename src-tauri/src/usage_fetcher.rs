@@ -1,3 +1,9 @@
+//! Fetches Claude.ai usage data via the claude.ai internal API.
+//!
+//! Calls `GET https://claude.ai/api/organizations/{org_id}/usage` using cookies
+//! from the Claude desktop app. Returns session (5-hour), weekly (7-day), and
+//! model-specific utilization percentages along with reset times.
+
 use std::sync::Mutex;
 
 use reqwest::Client;
@@ -5,7 +11,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::cookie_reader::ClaudeCookies;
 
-// --- Types sent to the frontend ---
+// --- Types shared with the frontend via Tauri IPC ---
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct UsageData {

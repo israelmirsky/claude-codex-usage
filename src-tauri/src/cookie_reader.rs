@@ -1,3 +1,11 @@
+//! Reads session cookies from the Claude desktop app's encrypted cookie store.
+//!
+//! The Claude desktop app (Electron-based) stores cookies in a SQLite database at
+//! `~/Library/Application Support/Claude/Cookies`. Cookie values are encrypted using
+//! AES-128-CBC with a key derived via PBKDF2 from the "Claude Safe Storage" macOS
+//! Keychain entry. The encrypted format is: `v10` prefix (3 bytes) + nonce (16 bytes)
+//! + IV (16 bytes) + ciphertext.
+
 use std::process::Command;
 
 use aes::Aes128;
@@ -30,9 +38,9 @@ pub enum CookieError {
 }
 
 pub struct ClaudeCookies {
-    pub session_key: String,
     pub org_id: String,
-    pub all_cookies: String, // formatted "name=value; name=value" for HTTP header
+    /// All cookies formatted as "name=value; name=value" for the HTTP Cookie header.
+    pub all_cookies: String,
 }
 
 fn get_safe_storage_key() -> Result<String, CookieError> {
@@ -119,7 +127,6 @@ pub fn read_claude_cookies() -> Result<ClaudeCookies, CookieError> {
         Ok((name, encrypted))
     })?;
 
-    let mut session_key = None;
     let mut org_id = None;
     let mut cookie_parts = Vec::new();
 
@@ -127,9 +134,7 @@ pub fn read_claude_cookies() -> Result<ClaudeCookies, CookieError> {
         let (name, encrypted) = row?;
         match decrypt_cookie_value(&encrypted, &key) {
             Ok(value) if !value.is_empty() => {
-                if name == "sessionKey" {
-                    session_key = Some(value.clone());
-                } else if name == "lastActiveOrg" {
+                if name == "lastActiveOrg" {
                     org_id = Some(value.clone());
                 }
                 cookie_parts.push(format!("{}={}", name, value));
@@ -140,12 +145,9 @@ pub fn read_claude_cookies() -> Result<ClaudeCookies, CookieError> {
 
     let _ = std::fs::remove_file(temp_path);
 
-    let session_key =
-        session_key.ok_or_else(|| CookieError::CookieNotFound("sessionKey".into()))?;
     let org_id = org_id.ok_or_else(|| CookieError::CookieNotFound("lastActiveOrg".into()))?;
 
     Ok(ClaudeCookies {
-        session_key,
         org_id,
         all_cookies: cookie_parts.join("; "),
     })
