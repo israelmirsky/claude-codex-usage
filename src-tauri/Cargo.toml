@@ -25,3 +25,5 @@ sha1 = "0.10"
 dirs = "5"
 thiserror = "1"
 chrono = { version = "0.4", features = ["serde"] }
+tauri-plugin-notification = "2"
+tauri-plugin-autostart = "2"
