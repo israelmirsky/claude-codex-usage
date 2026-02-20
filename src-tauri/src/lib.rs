@@ -14,7 +14,6 @@ use codex_fetcher::CodexState;
 use notifications::NotificationState;
 use settings::SettingsState;
 use tauri::{
-    image::Image,
     menu::{CheckMenuItem, Menu, MenuItem, PredefinedMenuItem, Submenu},
     tray::TrayIconBuilder,
     Emitter, Manager,
@@ -248,13 +247,9 @@ pub fn run() {
                 ],
             )?;
 
-            // Build tray icon (1x1 transparent icon for text-only display)
-            // Clone menu for use inside the event closure
+            // Build tray (text-only, no icon)
             let menu_ref = menu.clone();
-            let icon = Image::new(&[0u8; 4], 1, 1);
             let _tray = TrayIconBuilder::with_id("main")
-                .icon(icon)
-                .icon_as_template(true)
                 .title("C:--% X:--%")
                 .tooltip("Usage Widget")
                 .menu(&menu)
