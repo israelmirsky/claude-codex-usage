@@ -1,17 +1,21 @@
 //! Claude/Codex Usage - a macOS menu bar widget for monitoring AI rate limits.
 //!
 //! This is the Tauri backend that fetches usage data from Claude.ai and OpenAI Codex,
-//! manages a system tray icon with live usage percentages, and serves data to the
-//! React frontend via Tauri IPC commands.
+//! plus OpenRouter credit balance, manages a system tray icon with live usage stats,
+//! and serves data to the React frontend via Tauri IPC commands.
 
 mod codex_fetcher;
 mod cookie_reader;
 mod notifications;
+mod openrouter_fetcher;
+mod openrouter_keychain;
 mod settings;
 mod usage_fetcher;
 
 use codex_fetcher::CodexState;
 use notifications::NotificationState;
+use openrouter_fetcher::{OpenRouterCreditsData, OpenRouterState};
+use openrouter_keychain::OpenRouterKeyStatus;
 use settings::SettingsState;
 use tauri::{
     menu::{CheckMenuItem, Menu, MenuItem, PredefinedMenuItem, Submenu},
@@ -72,12 +76,45 @@ fn get_cached_codex(state: tauri::State<'_, CodexState>) -> Option<UsageData> {
 }
 
 #[tauri::command]
+async fn fetch_openrouter_credits(
+    state: tauri::State<'_, OpenRouterState>,
+    usage_state: tauri::State<'_, UsageState>,
+) -> Result<OpenRouterCreditsData, String> {
+    let data = openrouter_fetcher::fetch_openrouter_credits(&usage_state.client).await?;
+    *state.last_data.lock().unwrap() = Some(data.clone());
+    Ok(data)
+}
+
+#[tauri::command]
+fn get_cached_openrouter(state: tauri::State<'_, OpenRouterState>) -> Option<OpenRouterCreditsData> {
+    state.last_data.lock().unwrap().clone()
+}
+
+#[tauri::command]
+fn get_openrouter_key_status() -> Result<OpenRouterKeyStatus, String> {
+    openrouter_keychain::get_openrouter_key_status()
+}
+
+#[tauri::command]
+fn set_openrouter_key(api_key: String) -> Result<(), String> {
+    openrouter_keychain::set_openrouter_api_key(&api_key)
+}
+
+#[tauri::command]
+fn clear_openrouter_key(state: tauri::State<'_, OpenRouterState>) -> Result<(), String> {
+    openrouter_keychain::clear_openrouter_api_key()?;
+    *state.last_data.lock().unwrap() = None;
+    Ok(())
+}
+
+#[tauri::command]
 fn update_tray_text(
     app: tauri::AppHandle,
     claude_session: i32,
     claude_weekly: i32,
     codex_session: i32,
     codex_weekly: i32,
+    openrouter_remaining: f64,
 ) -> Result<(), String> {
     if let Some(tray) = app.tray_by_id("main") {
         let mut parts = Vec::new();
@@ -87,8 +124,11 @@ fn update_tray_text(
         if codex_session >= 0 && codex_weekly >= 0 {
             parts.push(format!("X:{}/{}%", codex_session, codex_weekly));
         }
+        if openrouter_remaining >= 0.0 {
+            parts.push(format!("OR:${:.2}", openrouter_remaining));
+        }
         let text = if parts.is_empty() {
-            "Usage: --%".to_string()
+            "Usage: --".to_string()
         } else {
             parts.join("  ")
         };
@@ -129,6 +169,7 @@ pub fn run() {
         ))
         .manage(UsageState::new())
         .manage(CodexState::new())
+        .manage(OpenRouterState::new())
         .setup(|app| {
             // Initialize settings
             let data_dir = app.path().app_data_dir().expect("no app data dir");
@@ -229,6 +270,8 @@ pub fn run() {
                 initial_settings.start_at_login,
                 None::<&str>,
             )?;
+            let open_settings =
+                MenuItem::with_id(app, "open_settings", "Settings...", true, None::<&str>)?;
 
             let sep2 = PredefinedMenuItem::separator(app)?;
             let quit = MenuItem::with_id(app, "quit", "Quit", true, None::<&str>)?;
@@ -242,6 +285,7 @@ pub fn run() {
                     &refresh_sub,
                     &notify_sub,
                     &start_login,
+                    &open_settings,
                     &sep2,
                     &quit,
                 ],
@@ -250,7 +294,7 @@ pub fn run() {
             // Build tray (text-only, no icon)
             let menu_ref = menu.clone();
             let _tray = TrayIconBuilder::with_id("main")
-                .title("C:--% X:--%")
+                .title("C:--% X:--% OR:--")
                 .tooltip("Usage Widget")
                 .menu(&menu)
                 .show_menu_on_left_click(true)
@@ -269,6 +313,13 @@ pub fn run() {
                         }
                         "refresh_now" => {
                             let _ = app.emit("usage-refresh-tick", ());
+                        }
+                        "open_settings" => {
+                            if let Some(w) = app.get_webview_window("main") {
+                                let _ = w.show();
+                                let _ = w.set_focus();
+                            }
+                            let _ = app.emit("open-settings", ());
                         }
                         "quit" => {
                             app.exit(0);
@@ -363,6 +414,11 @@ pub fn run() {
             get_cached_claude,
             fetch_codex_usage,
             get_cached_codex,
+            fetch_openrouter_credits,
+            get_cached_openrouter,
+            get_openrouter_key_status,
+            set_openrouter_key,
+            clear_openrouter_key,
             update_tray_text,
             toggle_pin,
             get_settings,

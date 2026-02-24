@@ -25,10 +25,19 @@ interface UsageData {
   fetched_at: string;
 }
 
+interface OpenRouterCreditsData {
+  total_credits: number;
+  total_usage: number;
+  remaining_credits: number;
+  fetched_at: string;
+}
+
 interface UsagePanelProps {
   data: UsageData | null;
   claudeData: UsageData | null;
   codexData: UsageData | null;
+  openRouterData: OpenRouterCreditsData | null;
+  openRouterError: string | null;
   loading: boolean;
   error: string | null;
   pinned: boolean;
@@ -57,10 +66,46 @@ function ProviderSection({ title, data }: { title: string; data: UsageData }) {
   );
 }
 
+function OpenRouterSection({
+  data,
+  error,
+}: {
+  data: OpenRouterCreditsData | null;
+  error: string | null;
+}) {
+  return (
+    <div className="usage-panel__section">
+      <div className="usage-panel__section-title">OpenRouter credits</div>
+      {data ? (
+        <>
+          <div className="usage-panel__credit-row">
+            <span>Remaining</span>
+            <strong>${data.remaining_credits.toFixed(2)}</strong>
+          </div>
+          <div className="usage-panel__credit-row">
+            <span>Used</span>
+            <span>${data.total_usage.toFixed(2)}</span>
+          </div>
+          <div className="usage-panel__credit-row">
+            <span>Total</span>
+            <span>${data.total_credits.toFixed(2)}</span>
+          </div>
+        </>
+      ) : error ? (
+        <div className="usage-panel__error-inline">{error}</div>
+      ) : (
+        <div className="usage-panel__hint">Open tray menu and choose Settings... to add your key.</div>
+      )}
+    </div>
+  );
+}
+
 export default function UsagePanel({
   data,
   claudeData,
   codexData,
+  openRouterData,
+  openRouterError,
   loading,
   error,
   pinned,
@@ -133,6 +178,7 @@ export default function UsagePanel({
               <ProviderSection title="Codex" data={codexData} />
             </div>
           )}
+          <OpenRouterSection data={openRouterData} error={openRouterError} />
           <div className="usage-panel__footer">
             Updated: {new Date(
               claudeData?.fetched_at || codexData?.fetched_at || ""
@@ -176,6 +222,8 @@ export default function UsagePanel({
               enabled={data.extra.enabled}
             />
           </div>
+
+          <OpenRouterSection data={openRouterData} error={openRouterError} />
 
           <div className="usage-panel__footer">
             Updated: {new Date(data.fetched_at).toLocaleTimeString()}
